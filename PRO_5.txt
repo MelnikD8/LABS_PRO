@@ -1,0 +1,53 @@
+int ProcNum = 0; // Кількість доступних процесів
+int ProcRank = 0; // Ранг поточного процесу
+int GridSize; // Розмір віртуальної решітки процесів
+int GridCoords[2]; // Координати поточного процесу у процесній решітці
+MPI_Comm GridComm; // Комунікатор у вигляді квадратної решітки
+MPI_Comm ColComm; // комунікатор – стовбець решітки
+MPI_Comm RowComm; // комунікатор – рядок решітки
+void main ( int argc, char * argv[] ) {
+ double* pAMatrix; // Перший аргумент матричного множення
+ double* pBMatrix; // Другий аргумент матричного множення
+ double* pCMatrix; // Результуюча матриця
+ int Size; // Розмір матриць
+ int BlockSize; // Розмір матричних блоків, що розташовані
+ // на процесах
+ double *pAblock; // Блок матриці А на процесі
+ double *pBblock; // Блок матриці В на процесі
+ double *pCblock; // Блок результуючої матриці С на процесі
+ double *pMatrixAblock;
+ double Start, Finish, Duration;
+ setvbuf(stdout, 0, _IONBF, 0);
+ MPI_Init(&argc, &argv);
+ MPI_Comm_size(MPI_COMM_WORLD, &ProcNum);
+ MPI_Comm_rank(MPI_COMM_WORLD, &ProcRank);
+ GridSize = sqrt((double)ProcNum);
+ if (ProcNum != GridSize*GridSize) {
+if (ProcRank == 0) {
+ printf ("Number of processes must be a perfect square \n");
+ }
+ }
+ else {
+ if (ProcRank == 0)
+ printf("Parallel matrix multiplication program\n");
+ // Створення віртуальної решітки процесів і комунікаторів рядків та стовбців
+ CreateGridCommunicators();
+
+ // Виділення пам’яті та ініціалізація елементів матриць
+ ProcessInitialization ( pAMatrix, pBMatrix, pCMatrix, pAblock,
+ pBblock, pCblock, pMatrixAblock, Size, BlockSize );
+
+ // Блочне розподілення матриць між процесами
+ DataDistribution(pAMatrix, pBMatrix, pMatrixAblock, pBblock, Size,
+ BlockSize);
+ // Виконання паралельного методу Фокса
+ ParallelResultCalculation(pAblock, pMatrixAblock, pBblock,
+ pCblock, BlockSize);
+ // Збір результуючої матриці на головному процесі
+ ResultCollection(pCMatrix, pCblock, Size, BlockSize);
+ // Завершення процесу обчислень
+ ProcessTermination (pAMatrix, pBMatrix, pCMatrix, pAblock, pBblock,
+ pCblock, pMatrixAblock);
+ }
+ MPI_Finalize();
+}
